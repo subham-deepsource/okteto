@@ -105,8 +105,10 @@ func getSolveOpt(buildCtx, file, imageTag, target string, noCache bool, cacheFro
 			{
 				Type: "image",
 				Attrs: map[string]string{
-					"name": imageTag,
-					"push": "true",
+					"name":           imageTag,
+					"push":           "true",
+					"unpack":         "false",
+					"oci-mediatypes": "false",
 				},
 			},
 		}
