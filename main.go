@@ -48,7 +48,7 @@ func init() {
 
 	err := godotenv.Load()
 	if err != nil {
-		log.Error("Error loading .env file")
+		log.Errorf("Error loading .env file: %s", err)
 	}
 
 	// override client-go error handlers to downgrade the "logging before flag.Parse" error
