@@ -35,6 +35,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
+	"github.com/joho/godotenv"
+
 	// Load the different library for authentication
 	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -43,6 +45,11 @@ import (
 
 func init() {
 	log.SetLevel("warn")
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Error("Error loading .env file")
+	}
 
 	// override client-go error handlers to downgrade the "logging before flag.Parse" error
 	errorHandlers := []func(error){
