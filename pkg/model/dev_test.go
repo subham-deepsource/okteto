@@ -974,7 +974,6 @@ func Test_loadEnvFile(t *testing.T) {
 	tests := []struct {
 		name      string
 		expectErr bool
-		envFile   string
 		content   map[string]string
 		existing  map[string]string
 		expected  map[string]string
@@ -1007,19 +1006,14 @@ func Test_loadEnvFile(t *testing.T) {
 			}
 
 			if tt.content != nil {
-				file, err := ioutil.TempFile("", tt.envFile)
+				file, err := createEnvFile(tt.content)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				defer os.Remove(file.Name())
+				defer os.Remove(file)
 
-				for k, v := range tt.content {
-					file.WriteString(fmt.Sprintf("%s=%s", k, v))
-				}
-
-				file.Sync()
-				dev.EnvFile = file.Name()
+				dev.EnvFile = file
 			}
 
 			for k, v := range tt.existing {
@@ -1052,4 +1046,77 @@ func Test_loadEnvFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_LoadDevWithEnvFile(t *testing.T) {
+	content := map[string]string{
+		"DEPLOYMENT":    "main",
+		"TAG":           "1.2",
+		"MY_VAR":        "from-env-file",
+		"SERVICE":       "secondary",
+		"SERVICE_IMAGE": "code/service:2.1",
+	}
+
+	f, err := createEnvFile(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer os.Remove(f)
+
+	manifest := []byte(fmt.Sprintf(`
+name: deployment-$DEPLOYMENT
+container: core
+image: code/core:$TAG
+command: ["uwsgi"]
+envFile: %s
+environment:
+- MY_VAR=$MY_VAR
+services:
+  - name: deployment-$SERVICE
+    container: core
+    image: $SERVICE_IMAGE
+    command: ["uwsgi"]
+    workdir: /app
+    environment:
+    - MY_VAR=$MY_VAR`, f))
+
+	if err := loadEnvFile(manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	main, err := Read(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(main.Services) != 1 {
+		t.Errorf("'services' was not parsed: %+v", main)
+	}
+
+	if main.Name != "deployment-main" {
+		t.Errorf("'name' was not parsed: got %s, expected %s", main.Name, "deployment-main")
+	}
+
+	if main.Image.Name != "code/core:1.2" {
+		t.Errorf("'tag' was not parsed: got %s, expected %s", main.Image.Name, "code/core:1.2")
+	}
+
+	if main.Environment[0].Value != "from-env-file" {
+		t.Errorf("'environment' was not parsed: got %s, expected %s", main.Environment[0].Value, "from-env-file")
+	}
+}
+
+func createEnvFile(content map[string]string) (string, error) {
+	file, err := ioutil.TempFile("", "envFile")
+	if err != nil {
+		return "", err
+	}
+
+	for k, v := range content {
+		file.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+	}
+
+	file.Sync()
+	return file.Name(), nil
 }
