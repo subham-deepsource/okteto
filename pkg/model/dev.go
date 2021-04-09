@@ -30,6 +30,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/okteto/okteto/pkg/k8s/labels"
 	"github.com/okteto/okteto/pkg/log"
+	"github.com/subosito/gotenv"
 	yaml "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -113,6 +114,10 @@ var (
 	once sync.Once
 )
 
+type environment struct {
+	EnvFile string `json:"envFile,omitempty" yaml:"envFile,omitempty"`
+}
+
 //Dev represents a development container
 type Dev struct {
 	Name                 string                `json:"name" yaml:"name"`
@@ -151,6 +156,7 @@ type Dev struct {
 	PersistentVolumeInfo *PersistentVolumeInfo `json:"persistentVolume,omitempty" yaml:"persistentVolume,omitempty"`
 	InitContainer        InitContainer         `json:"initContainer,omitempty" yaml:"initContainer,omitempty"`
 	Timeout              time.Duration         `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	EnvFile              string                `json:"envFile,omitempty" yaml:"envFile,omitempty"`
 }
 
 //Entrypoint represents the start command of a development container
@@ -275,6 +281,11 @@ func Get(devPath string) (*Dev, error) {
 		return nil, err
 	}
 
+	// we load the environment file first to make sure the new env vars are applied to the environment in the okteto manifest.
+	if err := loadEnvFile(b); err != nil {
+		return nil, err
+	}
+
 	dev, err := Read(b)
 	if err != nil {
 		return nil, err
@@ -336,9 +347,14 @@ func Read(bytes []byte) (*Dev, error) {
 		}
 	}
 
+	if err := dev.loadEnvFile(); err != nil {
+		return nil, err
+	}
+
 	if err := dev.expandEnvVars(); err != nil {
 		return nil, err
 	}
+
 	for _, s := range dev.Services {
 		if err := s.expandEnvVars(); err != nil {
 			return nil, err
@@ -358,6 +374,21 @@ func Read(bytes []byte) (*Dev, error) {
 	})
 
 	return dev, nil
+}
+
+func loadEnvFile(b []byte) error {
+	p := environment{}
+	if err := yaml.Unmarshal(b, &p); err != nil {
+		return fmt.Errorf("failed to parse the manifest")
+	}
+
+	if p.EnvFile != "" {
+		if err := gotenv.Load(p.EnvFile); err != nil {
+			return fmt.Errorf("failed to read envFile %s: %s", p.EnvFile, err)
+		}
+	}
+
+	return nil
 }
 
 func (dev *Dev) loadAbsPaths(devPath string) error {
@@ -395,7 +426,17 @@ func loadAbsPath(folder, path string) string {
 	return filepath.Join(folder, path)
 }
 
+func (dev *Dev) loadEnvFile() error {
+	if dev.EnvFile != "" {
+		if err := gotenv.Load(dev.EnvFile); err != nil {
+			return fmt.Errorf("failed to load envFile %s: %s", dev.EnvFile, err)
+		}
+	}
+
+	return nil
+}
 func (dev *Dev) expandEnvVars() error {
+
 	if err := dev.loadName(); err != nil {
 		return err
 	}
