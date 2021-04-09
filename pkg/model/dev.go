@@ -347,10 +347,6 @@ func Read(bytes []byte) (*Dev, error) {
 		}
 	}
 
-	if err := dev.loadEnvFile(); err != nil {
-		return nil, err
-	}
-
 	if err := dev.expandEnvVars(); err != nil {
 		return nil, err
 	}
@@ -426,15 +422,6 @@ func loadAbsPath(folder, path string) string {
 	return filepath.Join(folder, path)
 }
 
-func (dev *Dev) loadEnvFile() error {
-	if dev.EnvFile != "" {
-		if err := gotenv.Load(dev.EnvFile); err != nil {
-			return fmt.Errorf("failed to load envFile %s: %s", dev.EnvFile, err)
-		}
-	}
-
-	return nil
-}
 func (dev *Dev) expandEnvVars() error {
 
 	if err := dev.loadName(); err != nil {
