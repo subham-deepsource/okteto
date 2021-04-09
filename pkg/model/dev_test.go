@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v2"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -964,6 +965,90 @@ func TestGetTimeout(t *testing.T) {
 
 			if got != tt.want {
 				t.Errorf("GetTimeout() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_loadEnvFile(t *testing.T) {
+	tests := []struct {
+		name      string
+		expectErr bool
+		envFile   string
+		content   map[string]string
+		existing  map[string]string
+		expected  map[string]string
+	}{
+		{
+			name:      "missing",
+			expectErr: true,
+		},
+		{
+			name:      "basic",
+			expectErr: false,
+			content:   map[string]string{"foo": "bar"},
+			expected:  map[string]string{"foo": "bar"},
+		},
+		{
+			name:      "doesnt-override",
+			expectErr: false,
+			content:   map[string]string{"foo": "bar"},
+			existing:  map[string]string{"foo": "var"},
+			expected:  map[string]string{"foo": "var"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dev := Dev{
+				Image:   &BuildInfo{Name: "image:tag"},
+				Command: Command{Values: []string{"bash"}},
+				EnvFile: "env",
+			}
+
+			if tt.content != nil {
+				file, err := ioutil.TempFile("", tt.envFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				defer os.Remove(file.Name())
+
+				for k, v := range tt.content {
+					file.WriteString(fmt.Sprintf("%s=%s", k, v))
+				}
+
+				file.Sync()
+				dev.EnvFile = file.Name()
+			}
+
+			for k, v := range tt.existing {
+				os.Setenv(k, v)
+			}
+
+			b, err := yaml.Marshal(&dev)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = loadEnvFile(b)
+			if err != nil {
+				if tt.expectErr {
+					return
+				}
+
+				t.Fatal(err)
+			}
+
+			if tt.expectErr {
+				t.Fatal("call didn't fail as expected")
+			}
+
+			for k, v := range tt.expected {
+				got := os.Getenv(k)
+				if got != v {
+					t.Errorf("got %s=%s, expected %s=%s", k, got, k, v)
+				}
 			}
 		})
 	}

@@ -384,7 +384,7 @@ func loadEnvFile(b []byte) error {
 
 	if p.EnvFile != "" {
 		if err := gotenv.Load(p.EnvFile); err != nil {
-			return fmt.Errorf("failed to read envFile %s: %s", p.EnvFile, err)
+			return fmt.Errorf("failed to read envFile: %s", err)
 		}
 	}
 
