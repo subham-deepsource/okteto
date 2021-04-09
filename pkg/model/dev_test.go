@@ -1105,6 +1105,18 @@ services:
 	if main.Environment[0].Value != "from-env-file" {
 		t.Errorf("'environment' was not parsed: got %s, expected %s", main.Environment[0].Value, "from-env-file")
 	}
+
+	if main.Services[0].Name != "deployment-secondary" {
+		t.Errorf("'name' was not parsed: got %s, expected %s", main.Services[0].Name, "deployment-main")
+	}
+
+	if main.Services[0].Image.Name != "code/service:2.1" {
+		t.Errorf("'tag' was not parsed: got %s, expected %s", main.Services[0].Image.Name, "code/service:2.1")
+	}
+
+	if main.Services[0].Environment[0].Value != "from-env-file" {
+		t.Errorf("'environment' was not parsed: got %s, expected %s", main.Services[0].Environment[0].Value, "from-env-file")
+	}
 }
 
 func createEnvFile(content map[string]string) (string, error) {
